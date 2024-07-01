@@ -1,0 +1,42 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "compile",
+            "type": "shell",
+            "command": "make",
+            "options": {
+                "cwd": "${workspaceFolder}/src/userprog"
+            }
+        },
+        {
+            "label": "Run Test in GDB mode",
+            "type": "shell",
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "pattern": [
+                        {
+                            "regexp": ".",
+                            "file": 1,
+                            "location": 2,
+                            "message": 3
+                        }
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": ".",
+                        "endsPattern": ".",
+                    }
+                }
+            ],
+            "dependsOn": [
+                "compile"
+            ],
+            "command": "pintos -v -k -T 60 --qemu --gdb --filesys-size=2 -p tests/userprog/do-nothing -a do-nothing -- -q  -f -f run do-nothing",
+            "options": {
+                "cwd": "${workspaceFolder}/src/userprog/build"
+            }
+        }
+    ]
+}

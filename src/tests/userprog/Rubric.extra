@@ -1,0 +1,10 @@
+Floating point functionality - extra:
+- Test floating point compilation and initialization
+1	floating-point
+2	fp-init
+
+- Test floating point correctness
+3	fp-simul
+5	fp-asm
+5	fp-syscall
+3	fp-kernel-e
