@@ -304,10 +304,10 @@ int sys_write(int fd, const void *buffer, unsigned size); /* Writes to a file de
      - return int from file_tell function.
 * close
      - access file, do nothing if null.
-		   - use file_close, then remove fd from the fd list.
-		   - free any resources associated.
-	* exit
-     - exit is already implemented, but whenever these new changes are implemented, will have to add to the exit function
+     - use file_close, then remove fd from the fd list.
+     - free any resources associated.
+* exit
+     - exit is already implemented, but whenever these new changes are implemented, will have to add to the exit function due to new memory considerations
      - on process exit, make sure to clean up => close all file descriptors
 	
 #### Synchronization
