@@ -59,6 +59,7 @@
         "interrupt.h": "c",
         "malloc.h": "c",
         "palloc.h": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "thread.h": "c"
     },
 }
