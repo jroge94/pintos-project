@@ -278,8 +278,8 @@ int sys_write(int fd, const void *buffer, unsigned size); /* Writes to a file de
      - returns file descriptor value
      - don't forget to add to the fd_list, link the file and the fd value.
 
- ***When fd = 0 or fd = 1, use I/O functions in src/lib/stdio.h instead of the normal file operation functions being used***
-    - not completely sure how they work, but they seem to be analogs to 
+ **When fd = 0 or fd = 1, use I/O functions in src/lib/stdio.h instead of the normal file operation functions being used**
+    not completely sure how they work, but they seem to be analogs to 
 * filesize
      - get the file at fd,check if null, 0, or 1
      - use file_length function on file
@@ -333,7 +333,7 @@ int sys_write(int fd, const void *buffer, unsigned size); /* Writes to a file de
 # Process controls
 
 ## Data structures and functions
-
+```c
 /* Structure to represent child processes. */
 struct child_process {
     tid_t tid;                   // Thread ID of the child.
@@ -342,32 +342,33 @@ struct child_process {
     struct semaphore sema_wait;  // Semaphore for parent to wait on child.
     struct list_elem elem;       // List element for child list.
 };
+```
+* This structure holds information about child processes, and helps facilitate synchronization and the status of a child process.
 
-This structure holds information about child processes, and helps facilitate synchronization and the status of a child process.
-
+```c
 /* Modifying struct thread in thread.h */
 struct list child_list;          // List of child processes.
 struct child_process *cp;        // Pointer to own child_process struct.
 struct semaphore sema_exec;      // Semaphore for synchronization during exec
 struct semaphore sema_exit;      // Semaphore for synchronization during exit
 bool load_success;               // Checks if process has loaded succesfully
-
-Global variables
+```
+#### Global variables
 
 
 
 ### Functions
-
+```c
 bool validate_user_pointer(const void *ptr);
 // Checks if user pointer is valid
 bool copy_in(void *dst, const void *usrc, size_t size)
 // Safely copying data from user to kernel space
 bool copy_out(void *udst, const void *src, size_t size)
 // Safely copying data from kernel space to user space
-
+```
 ### Algorithms 
 
-Accessing user memory Safely
+#### Accessing user memory Safely
 
 1. We first would use validate_user_pointer to ensure the pointer is valid.
 2. We use copy_in() and copy_out() to transfer data between user and kernel
@@ -391,13 +392,13 @@ Inside of syscall_handler function in syscalls.c
 #### Implementation of wait sys call
 Parent process
 1. Retrieve and validate PID argument from user stack.
-1. Traverse child_list to find the child_process with given PID.
-2. Check if child is already waited on, if it is return -1 to prevent multiple waits.
-We also need to check here if the PID corresponds to a direct child or not, if it does not wait() should return -1.
-We also need to make sure that if the child did not call exit() and was instead terminated by the kernel, wait() should return -1.
-3. If not, set wait_istrue to true and call sema_down(&child->sema_wait) to block until child signals termination.
-4. After unblocking, get exit status of child and remove it from child_list. Free its memory.
-5. Return exit status to user program
+2. Traverse child_list to find the child_process with given PID.
+3. Check if child is already waited on, if it is return -1 to prevent multiple waits.
+  a\. We also need to check here if the PID corresponds to a direct child or not, if it does not wait() should return -1.
+  b\. We also need to make sure that if the child did not call exit() and was instead terminated by the kernel, wait() should return -1.
+4. If not, set wait_istrue to true and call sema_down(&child->sema_wait) to block until child signals termination.
+5. After unblocking, get exit status of child and remove it from child_list. Free its memory.
+6. Return exit status to user program
 Child process on exit
 1. In process_exit(), set cp->exit_status to the process's exit status.
 2. Call sema_up(&cp->sema_wait) to unblock any waiting parent 
@@ -407,7 +408,7 @@ Child process on exit
 
 Parent process
 1. Initialize synchronization
-  - Initialize sema_init and thread_current->load_success = false
+   a\. Initialize sema_init and thread_current->load_success = false
 2. Execute process_execute to create the child process
 3. Call sema_down to wait for child to signal
 4. Check load success with load_success is true/false
