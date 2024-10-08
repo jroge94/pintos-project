@@ -328,11 +328,11 @@ int sys_write(int fd, const void *buffer, unsigned size); /* Writes to a file de
 * Also, using a simpler lock initially allows us to make sure that our code works without having to worry too much about 
 	   figuring out synchronization for now. It also shouldn't be too hard to upgrade in the future.
 
-Jack Thomas
-Design Document
-Process controls
+#### Jack Thomas
+#### Design Document
+# Process controls
 
-Data structures and functions
+## Data structures and functions
 
 /* Structure to represent child processes. */
 struct child_process {
@@ -356,7 +356,7 @@ Global variables
 
 
 
-Functions
+### Functions
 
 bool validate_user_pointer(const void *ptr);
 // Checks if user pointer is valid
@@ -365,18 +365,18 @@ bool copy_in(void *dst, const void *usrc, size_t size)
 bool copy_out(void *udst, const void *src, size_t size)
 // Safely copying data from kernel space to user space
 
-Algorithms 
+### Algorithms 
 
 Accessing user memory Safely
 
 1. We first would use validate_user_pointer to ensure the pointer is valid.
 2. We use copy_in() and copy_out() to transfer data between user and kernel
 
-Implementaiton of system calls
+#### Implementaiton of system calls
 
 Inside of syscall_handler function in syscalls.c
   
-Implementation of practice syscall
+#### Implementation of practice syscall
 
 1. Retrieve system call argument from user stack
 2. Validate user pointer with validate_user_pointer function
@@ -384,11 +384,11 @@ Implementation of practice syscall
 4. Call the syscall implementation and set return value
     - f->eax = i + 1
 
-Implementation of halt syscall
+#### Implementation of halt syscall
 1. if args[0] = SYS_HALT
 2. call function shutdown_power_off()
 
-Implementation of wait sys call
+#### Implementation of wait sys call
 Parent process
 1. Retrieve and validate PID argument from user stack.
 1. Traverse child_list to find the child_process with given PID.
@@ -403,7 +403,7 @@ Child process on exit
 2. Call sema_up(&cp->sema_wait) to unblock any waiting parent 
 3. Cleanup resources
 
-Implementation of exec System Call
+#### Implementation of exec System Call
 
 Parent process
 1. Initialize synchronization
@@ -418,7 +418,7 @@ In Child process
 2. Set load status to true if succesfull and false if unsuccesfull.
 3. Signal parent to unblock if successful with sema_up
 
-Implementation of exit system call
+#### Implementation of exit system call
 
 1. Get exit status argument from user stack
 2. Validate pointer and copy the exit status with copy_in()
@@ -426,7 +426,7 @@ Implementation of exit system call
 4. Signal possible waiting parent process using sema_up
 5. Close files and call thread_exit to terminate the process.
 
-Synchronization
+### Synchronization
 
 1. struct child_process
     - Accessed by both parent and child processes
@@ -462,7 +462,7 @@ Synchronization
     - Synchronization
         The parent will wait on sema_wait and only read the exit status until after the child has signaled to the parent process.
         
-Rationale
+### Rationale
 
 This design aims to provide a clear and efficient implenetation of the required functionalities for processs control. We use simple data structures like struct child_process 
 to make it easy to manage child-specific information and synchronization. We also utilize clear synchronization mechanisms with the use of sema_wait, sema_exec, and sema_exit to synchronize between parent
