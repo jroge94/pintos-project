@@ -94,7 +94,15 @@ struct thread {
   struct list_elem elem; /* List element. */
 
 #ifdef USERPROG
-  /* Owned by process.c. */
+  /* Owned by userprog/process.c */
+  uint32_t *pagedir;               /* Page directory */
+  struct semaphore wait;           /* Semaphore used to wait for a process to finish */
+  struct semaphore load;           /* Semaphore used to wait for a process to load */
+  
+  struct list child_list;          /* List of child processes */
+  struct thread *parent;           /* Pointer to parent thread */
+  int exit_status;                 /* Exit status */
+  /* If you need pcb, include it inside the USERPROG block */
   struct process* pcb; /* Process control block if this thread is a userprog */
 #endif
 
