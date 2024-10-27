@@ -59,6 +59,9 @@
         "interrupt.h": "c",
         "malloc.h": "c",
         "palloc.h": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "syscall-nr.h": "c",
+        "string.h": "c",
+        "shutdown.h": "c"
     },
 }

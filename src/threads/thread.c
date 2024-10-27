@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -116,6 +117,10 @@ void thread_init(void) {
   init_thread(initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid();
+
+  /* Initialize its child_list_lock */
+  list_init(&initial_thread->child_list);
+  lock_init(&initial_thread->child_list_lock);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -186,12 +191,36 @@ tid_t thread_create(const char* name, int priority, thread_func* function,
 
   /* Allocate thread. */
   t = palloc_get_page(PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL) {
     return TID_ERROR;
-
+  }
   /* Initialize thread. */
   init_thread(t, name, priority);
   tid = t->tid = allocate_tid();
+
+#ifdef USERPROG
+  /* Initialize child_process struct */
+  struct child_process *cp = malloc(sizeof(struct child_process));
+  if (cp == NULL) {
+    palloc_free_page(t);
+    return TID_ERROR;
+  }
+  cp->pid = tid;
+  cp->exit_status = 0;
+  cp->waited = false;
+  sema_init(&cp->sema_wait, 0);
+  sema_init(&cp->load_sema, 0);
+  cp->load_success = false; 
+
+  /* Add to parents child list */
+  struct thread *parent = thread_current();
+  lock_acquire(&parent->child_list_lock);
+  list_push_back(&parent->child_list, &cp->elem);
+  lock_release(&parent->child_list_lock);
+
+  /* Set child threads cp pointer*/
+  t->cp = cp;
+#endif
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -440,9 +469,12 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
 
+
 #ifdef USERPROG
   /* init process-related informations.*/
   t->pcb = NULL;
+  list_init(&t->child_list);
+  lock_init(&t->child_list_lock);
 #endif
 }
 

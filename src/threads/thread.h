@@ -7,6 +7,13 @@
 #include <list.h>
 #include <stdint.h>
 
+struct process;
+struct child_process;
+typedef int tid_t;
+#define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
+typedef int pid_t;
+
+
 /* States in a thread's life cycle. */
 enum thread_status {
   THREAD_RUNNING, /* Running thread. */
@@ -17,8 +24,6 @@ enum thread_status {
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
-typedef int tid_t;
-#define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
 
 /* Thread priorities. */
 #define PRI_MIN 0      /* Lowest priority. */
@@ -91,14 +96,22 @@ struct thread {
   struct list_elem allelem;  /* List element for all threads list. */
 
   /* Shared between thread.c and synch.c. */
-  struct list_elem elem; /* List element. */
+
+  struct child_process *cp;
+  int exit_status;
+  struct semaphore load_sema;
+  bool load_success;
+  uint32_t *pagedir; /* Page directory */
 
 #ifdef USERPROG
   /* Owned by process.c. */
+  struct list child_list;
+  struct lock child_list_lock;
   struct process* pcb; /* Process control block if this thread is a userprog */
 #endif
 
   /* Owned by thread.c. */
+  struct list_elem elem;
   unsigned magic; /* Detects stack overflow. */
 };
 

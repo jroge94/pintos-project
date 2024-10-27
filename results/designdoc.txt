@@ -1,4 +1,3 @@
-Jack Thomas
 Design Document
 Process controls
 
@@ -21,10 +20,6 @@ struct child_process *cp;        // Pointer to own child_process struct.
 struct semaphore sema_exec;      // Semaphore for synchronization during exec
 struct semaphore sema_exit;      // Semaphore for synchronization during exit
 bool load_success;               // Checks if process has loaded succesfully
-
-Global variables
-
-
 
 Functions
 
