@@ -20,6 +20,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#define MAX_ARGS 128
+
 static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static thread_func start_pthread NO_RETURN;
@@ -76,65 +78,104 @@ pid_t process_execute(const char *file_name) {
     return tid;
 }
 
-/* A thread function that loads a user process and starts it
-   running. */
-static void start_process(void* file_name_) {
-  char* file_name = (char*)file_name_;
-  struct thread* t = thread_current();
-  struct intr_frame if_;
-  bool success, pcb_success;
+/* Function to parse the command line into argc and argv */
+static char *parse_command_line(const char *cmdline, int *argc, char ***argv) {
+    char *argv_storage[MAX_ARGS];
+    char *token, *save_ptr;
+    int count = 0;
 
-  /* Retrieve process control block */
-  struct process* new_pcb = calloc(sizeof(struct process), 1);
-  success = pcb_success = new_pcb != NULL;
+    /* Make a writable copy of cmdline */
+    char *cmdline_copy = palloc_get_page(0);
+    if (cmdline_copy == NULL)
+        PANIC("Not enough memory to parse command line.");
+    strlcpy(cmdline_copy, cmdline, PGSIZE);
 
-  /* Initialize process control block */
-  if (success) {
-    // Ensure that timer_interrupt() -> schedule() -> process_activate()
-    // does not try to activate our uninitialized pagedir
-    new_pcb->pagedir = NULL;
-    t->pcb = new_pcb;
+    /* Tokenize the command line */
+    token = strtok_r(cmdline_copy, " ", &save_ptr);
+    while (token != NULL && count < MAX_ARGS) {
+        argv_storage[count++] = token;
+        token = strtok_r(NULL, " ", &save_ptr);
+    }
 
-    // Continue initializing the PCB as normal
-    t->pcb->main_thread = t;
-    strlcpy(t->pcb->process_name, t->name, sizeof t->name);
-  }
+    /* Allocate memory for argv */
+    *argv = malloc(sizeof(char *) * (count + 1));  // Use malloc instead of palloc_get_page
+    if (*argv == NULL)
+        PANIC("Not enough memory for argv.");
 
-  /* Initialize interrupt frame and load executable. */
-  if (success) {
-    memset(&if_, 0, sizeof if_);
-    if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
-    if_.cs = SEL_UCSEG;
-    if_.eflags = FLAG_IF | FLAG_MBS;
-    success = load(file_name, &if_.eip, &if_.esp, NULL, 0);
-  }
+    /* Initialize argv with tokens */
+    for (int i = 0; i < count; i++) {
+        (*argv)[i] = argv_storage[i];
+    }
+    (*argv)[count] = NULL;  // Null-terminate argv
 
-  /* Handle failure with succesful PCB malloc. Must free the PCB */
-  if (!success && pcb_success) {
-    // Avoid race where PCB is freed before t->pcb is set to NULL
-    // If this happens, then an unfortuantely timed timer interrupt
-    // can try to activate the pagedir, but it is now freed memory
-    struct process* pcb_to_free = t->pcb;
-    t->pcb = NULL;
-    free(pcb_to_free);
-  }
+    *argc = count;
 
-  /* Clean up. Exit on failure or jump to userspace */
-  palloc_free_page(file_name);
-  if (!success) {
-    sema_up(&temporary);
-    thread_exit();
-  }
-
-  /* Start the user process by simulating a return from an
-     interrupt, implemented by intr_exit (in
-     threads/intr-stubs.S).  Because intr_exit takes all of its
-     arguments on the stack in the form of a `struct intr_frame',
-     we just point the stack pointer (%esp) to our stack frame
-     and jump to it. */
-  asm volatile("movl %0, %%esp; jmp intr_exit" : : "g"(&if_) : "memory");
-  NOT_REACHED();
+    
+    return cmdline_copy;
 }
+
+
+
+/* Modified start_process function */
+static void start_process(void* file_name_) {
+    char* file_name = (char*)file_name_;
+    struct thread* t = thread_current();
+    struct intr_frame if_;
+    bool success, pcb_success;
+    int argc;
+    char **argv;
+    char *cmdline_copy;
+
+    /* Retrieve and initialize process control block */
+    struct process* new_pcb = calloc(sizeof(struct process), 1);
+    success = pcb_success = new_pcb != NULL;
+
+    if (success) {
+        new_pcb->pagedir = NULL;
+        t->pcb = new_pcb;
+        t->pcb->main_thread = t;
+        strlcpy(t->pcb->process_name, t->name, sizeof t->name);
+    }
+
+    /* Parse command line into arguments */
+    if (success) {
+        cmdline_copy = parse_command_line(file_name, &argc, &argv);
+    }
+
+    /* Initialize interrupt frame and load executable */
+    if (success) {
+        memset(&if_, 0, sizeof if_);
+        if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
+        if_.cs = SEL_UCSEG;
+        if_.eflags = FLAG_IF | FLAG_MBS;
+        success = load(argv[0], &if_.eip, &if_.esp, argv, argc);
+    }
+
+    /* Handle failure: free PCB */
+    if (!success && pcb_success) {
+        struct process* pcb_to_free = t->pcb;
+        t->pcb = NULL;
+        free(pcb_to_free);
+    }
+
+    /* Clean up: free command line copy */
+    palloc_free_page(file_name);
+    if (!success) {
+        sema_up(&temporary);
+        thread_exit();
+    }
+
+    /* Free argv and cmdline_copy after setup_stack is done */
+    if (argv != NULL)
+        free(argv);  // Use free() since we used malloc()
+    if (cmdline_copy != NULL)
+        palloc_free_page(cmdline_copy);
+
+    /* Start the user process by simulating a return from an interrupt */
+    asm volatile("movl %0, %%esp; jmp intr_exit" : : "g"(&if_) : "memory");
+    NOT_REACHED();
+}
+
 
 /* Waits for process with PID child_pid to die and returns its exit status.
    If it was terminated by the kernel (i.e. killed due to an
@@ -362,6 +403,7 @@ static bool load(const char* file_name, void (**eip)(void), void** esp, char **a
   if (!setup_stack(esp, argv, argc))
     goto done;
 
+
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
 
@@ -476,28 +518,26 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage, uint32_t 
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
-setup_stack(void **esp, char **argv, int argc) {
+static bool setup_stack(void **esp, char **argv, int argc) {
     uint8_t *kpage;
     bool success = false;
     int i;
-    void *arg_addr[argc];
+    void *arg_addr[MAX_ARGS]; // Assuming MAX_ARGS is large enough
 
     /* Allocate a zeroed page at the top of user virtual memory */
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
         if (success)
-            *esp = PHYS_BASE - 4;  // Set the stack pointer to the top of the page
+            *esp = PHYS_BASE;  // Correctly set stack pointer to PHYS_BASE
         else {
             palloc_free_page(kpage);
             return success;
         }
-    } else {
+    } else
         return success;
-    }
 
-    /* Push arguments onto the stack in reverse order */
+    /* Push argument strings onto the stack in reverse order */
     for (i = argc - 1; i >= 0; i--) {
         size_t arg_len = strlen(argv[i]) + 1;
         *esp -= arg_len;
@@ -505,9 +545,9 @@ setup_stack(void **esp, char **argv, int argc) {
         arg_addr[i] = *esp;  // Save the address of each argument
     }
 
-    /* Word-align the stack pointer to a multiple of 4 */
+    /* Word align */
     uintptr_t esp_uint = (uintptr_t)(*esp);
-    esp_uint &= 0xfffffffc;
+    esp_uint = esp_uint & 0xfffffff0;
     *esp = (void *)esp_uint;
 
     /* Push a null pointer sentinel */
@@ -517,24 +557,28 @@ setup_stack(void **esp, char **argv, int argc) {
     /* Push the addresses of the arguments */
     for (i = argc - 1; i >= 0; i--) {
         *esp -= sizeof(char *);
-        *(char **)(*esp) = arg_addr[i];
+        memcpy(*esp, &arg_addr[i], sizeof(char *));
     }
 
-    /* Push argv (address of argv[0]) */
-    char **argv_ptr = *esp;
+    /* Save argv address (address of argv[0]) */
+    void *argv_addr = *esp;
+
+    /* Push argv */
     *esp -= sizeof(char **);
-    *(char ***)(*esp) = argv_ptr;
+    memcpy(*esp, &argv_addr, sizeof(char **));
 
     /* Push argc */
     *esp -= sizeof(int);
-    *(int *)(*esp) = argc;
+    memcpy(*esp, &argc, sizeof(int));
 
     /* Push fake return address */
     *esp -= sizeof(void *);
     *(void **)(*esp) = NULL;
 
+
     return success;
 }
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.

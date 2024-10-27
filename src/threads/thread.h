@@ -96,6 +96,8 @@ struct thread {
 #ifdef USERPROG
   /* Owned by process.c. */
   struct process* pcb; /* Process control block if this thread is a userprog */
+  uint32_t* pagedir;   /* Page directory. */
+  int exit_status;     /* Exit status of the process */
 #endif
 
   /* Owned by thread.c. */
