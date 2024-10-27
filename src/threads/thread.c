@@ -1,4 +1,9 @@
 #include "threads/thread.h"
+#include <debug.h>
+#include <stddef.h>
+#include <random.h>
+#include <stdio.h>
+#include <string.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -6,11 +11,6 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include <debug.h>
-#include <random.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -85,11 +85,10 @@ typedef struct thread* scheduler_func(void);
 
 /* Jump table for dynamically dispatching the current scheduling
    policy in use by the kernel. */
-scheduler_func* scheduler_jump_table[8]
-    = { thread_schedule_fifo,     thread_schedule_prio,
-        thread_schedule_fair,     thread_schedule_mlfqs,
-        thread_schedule_reserved, thread_schedule_reserved,
-        thread_schedule_reserved, thread_schedule_reserved };
+scheduler_func* scheduler_jump_table[8] = {thread_schedule_fifo,     thread_schedule_prio,
+                                           thread_schedule_fair,     thread_schedule_mlfqs,
+                                           thread_schedule_reserved, thread_schedule_reserved,
+                                           thread_schedule_reserved, thread_schedule_reserved};
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -155,8 +154,8 @@ void thread_tick(void) {
 
 /* Prints thread statistics. */
 void thread_print_stats(void) {
-  printf("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
-         idle_ticks, kernel_ticks, user_ticks);
+  printf("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n", idle_ticks, kernel_ticks,
+         user_ticks);
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -174,8 +173,7 @@ void thread_print_stats(void) {
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
-tid_t thread_create(const char* name, int priority, thread_func* function,
-                    void* aux) {
+tid_t thread_create(const char* name, int priority, thread_func* function, void* aux) {
   struct thread* t;
   struct kernel_thread_frame* kf;
   struct switch_entry_frame* ef;
@@ -230,7 +228,7 @@ void thread_block(void) {
 
 /* Places a thread on the ready structure appropriate for the
    current active scheduling policy.
-
+   
    This function must be called with interrupts turned off. */
 static void thread_enqueue(struct thread* t) {
   ASSERT(intr_get_level() == INTR_OFF);
@@ -330,9 +328,7 @@ void thread_foreach(thread_action_func* func, void* aux) {
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void thread_set_priority(int new_priority) {
-  thread_current()->priority = new_priority;
-}
+void thread_set_priority(int new_priority) { thread_current()->priority = new_priority; }
 
 /* Returns the current thread's priority. */
 int thread_get_priority(void) { return thread_current()->priority; }
@@ -416,9 +412,7 @@ struct thread* running_thread(void) {
 }
 
 /* Returns true if T appears to point to a valid thread. */
-static bool is_thread(struct thread* t) {
-  return t != NULL && t->magic == THREAD_MAGIC;
-}
+static bool is_thread(struct thread* t) { return t != NULL && t->magic == THREAD_MAGIC; }
 
 /* Does basic initialization of T as a blocked thread named
    NAME. */
@@ -434,16 +428,12 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t*)t + PGSIZE;
   t->priority = priority;
+  t->pcb = NULL;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
-
-#ifdef USERPROG
-  /* init process-related informations.*/
-  t->pcb = NULL;
-#endif
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
