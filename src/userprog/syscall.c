@@ -58,18 +58,26 @@ static void syscall_handler(struct intr_frame *f UNUSED)
         }
         case SYS_EXEC:
         {
-          check_buffer_valid(&args[1], sizeof(args[1]));
-          const char *cmd_line = (const char *) args[1];
-          check_buffer_valid(cmd_line, 128);
-          f->eax = sys_exec(cmd_line);
-          break;
+            const char *cmd_line;
+            check_buffer_valid(&args[1], sizeof(args[1]));
+            cmd_line = (const char *) args[1];
+            // Validate that cmd_line points to a valid string
+            char *kcmd_line = copy_in_string(cmd_line);
+            if (kcmd_line == NULL) {
+                f->eax = (pid_t) -1;
+                break;
+            }
+            f->eax = sys_exec(kcmd_line);
+            free(kcmd_line);
+            break;
         }
         case SYS_WAIT:
         {
-          check_buffer_valid(&args[1], sizeof(args[1]));
-          pid_t pid = (pid_t) args[1];
-          f->eax = sys_wait(pid);
-          break;
+          pid_t pid;
+            check_buffer_valid(&args[1], sizeof(args[1]));
+            pid = (pid_t) args[1];
+            f->eax = sys_wait(pid);
+            break;
         }
         default:
           printf("Unknown syscall number: %d\n", syscall_number);
@@ -111,33 +119,26 @@ static void check_pointer_valid(const void *p)
 /* Copies a string from user space to kernel space */
 static char *copy_in_string(const char *us)
 {
-    char *ks = malloc(128); // Initial buffer size
-    if (ks == NULL)
-    {
+    size_t max_length = 128;
+    char *ks = malloc(max_length);
+    if (ks == NULL) {
         sys_exit(-1);
     }
-    size_t bufsize = 128;
+
     size_t i = 0;
-    while (true)
-    {
+    while (i < max_length - 1) {  // Reserve space for null terminator
         check_pointer_valid((const void *)(us + i));
         ks[i] = us[i];
-        if (ks[i] == '\0')
-        {
-            break;
+        if (ks[i] == '\0') {
+            return ks;
         }
         i++;
-        if (i >= bufsize) {
-            bufsize *= 2;
-            char *new_ks = realloc(ks, bufsize);
-            if (new_ks == NULL) {
-                free(ks);
-                sys_exit(-1);
-            }
-            ks = new_ks;
-        }
     }
-    return ks;
+
+    // If the string exceeds max_length, terminate it and exit
+    ks[max_length - 1] = '\0';
+    sys_exit(-1);
+    return NULL; 
 }
 
 /* Terminates the process with the given exit status */

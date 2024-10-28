@@ -49,6 +49,7 @@ int process_wait(pid_t);
 void process_exit(void);
 void process_activate(void);
 
+
 bool is_main_thread(struct thread*, struct process*);
 pid_t get_pid(struct process*);
 
@@ -56,5 +57,7 @@ tid_t pthread_execute(stub_fun, pthread_fun, void*);
 tid_t pthread_join(tid_t);
 void pthread_exit(void);
 void pthread_exit_main(void);
+
+void process_exit_with_status(int status);
 
 #endif /* userprog/process.h */

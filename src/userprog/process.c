@@ -67,6 +67,7 @@ void process_exit_with_status(int status) {
 
     /* Clean up child processes */
     struct list_elem *e;
+
     lock_acquire(&cur->child_list_lock);
     while (!list_empty(&cur->child_list)) {
         e = list_pop_front(&cur->child_list);
@@ -111,7 +112,11 @@ pid_t process_execute(const char *file_name) {
 
     /* Extract program name from file_name */
     program_name = strtok_r(fn_copy, " ", &save_ptr);
-
+    if (program_name == NULL) {
+        palloc_free_page(fn_copy);
+        palloc_free_page(file_name_copy);
+        return TID_ERROR;
+        }
     /* Create a new thread to execute PROGRAM_NAME */
     tid = thread_create(program_name, PRI_DEFAULT, start_process, file_name_copy);
     if (tid == TID_ERROR) {
@@ -136,6 +141,7 @@ pid_t process_execute(const char *file_name) {
     }
     if (cp == NULL) {
       palloc_free_page(file_name_copy);
+      lock_release(&cur->child_list_lock);
       return -1;
     }
 
@@ -164,7 +170,7 @@ static void start_process(void* file_name_) {
   /* Allocate and initialize the PCB for the thread */
   t->pcb = calloc(sizeof(struct process), 1);
   if (t->pcb == NULL) {
-    sys_exit(-1); // Terminate the process if PCB allocation fails
+    process_exit_with_status(-1); // Terminate the process if PCB allocation fails
   }
 
   /* Initialize interrupt frame and load executable */

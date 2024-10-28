@@ -324,6 +324,11 @@ void thread_exit(void) {
      when it calls thread_switch_tail(). */
   intr_disable();
   list_remove(&thread_current()->allelem);
+  #ifdef USERPROG
+    if (thread_current()->pcb != NULL) {
+      process_exit_with_status(thread_current()->exit_status);
+    }
+  #endif
   thread_current()->status = THREAD_DYING;
   schedule();
   NOT_REACHED();
