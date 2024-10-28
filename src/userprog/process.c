@@ -58,6 +58,7 @@ void userprog_init(void) {
    process id, or TID_ERROR if the thread cannot be created. */
 pid_t process_execute(const char *file_name) {
     char *fn_copy;
+    char *file_name_copy;
     char *save_ptr;
     char *program_name;
     tid_t tid;
@@ -68,15 +69,26 @@ pid_t process_execute(const char *file_name) {
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
 
-    /* Extract program name from file_name */
-    program_name = strtok_r(fn_copy, " ", &save_ptr);
+    /* Make another copy for program_name extraction */
+    file_name_copy = malloc(strlen(file_name) + 1);
+    if (file_name_copy == NULL) {
+        palloc_free_page(fn_copy);
+        return TID_ERROR;
+    }
+    strlcpy(file_name_copy, file_name, PGSIZE);
+
+    /* Extract program name from file_name_copy */
+    program_name = strtok_r(file_name_copy, " ", &save_ptr);
 
     /* Create a new thread to execute PROGRAM_NAME */
     tid = thread_create(program_name, PRI_DEFAULT, start_process, fn_copy);
     if (tid == TID_ERROR)
         palloc_free_page(fn_copy);
+
+    free(file_name_copy);
     return tid;
 }
+
 
 /* Function to parse the command line into argc and argv */
 static char *parse_command_line(const char *cmdline, int *argc, char ***argv) {
@@ -545,9 +557,9 @@ static bool setup_stack(void **esp, char **argv, int argc) {
         arg_addr[i] = *esp;  // Save the address of each argument
     }
 
-    /* Word align */
+    /* Word-align the stack pointer to a multiple of 4 */
     uintptr_t esp_uint = (uintptr_t)(*esp);
-    esp_uint = esp_uint & 0xfffffff0;
+    esp_uint = esp_uint & 0xfffffffc;
     *esp = (void *)esp_uint;
 
     /* Push a null pointer sentinel */
@@ -557,7 +569,7 @@ static bool setup_stack(void **esp, char **argv, int argc) {
     /* Push the addresses of the arguments */
     for (i = argc - 1; i >= 0; i--) {
         *esp -= sizeof(char *);
-        memcpy(*esp, &arg_addr[i], sizeof(char *));
+        *(char **)(*esp) = arg_addr[i];  // Correctly assign the address
     }
 
     /* Save argv address (address of argv[0]) */
@@ -575,9 +587,9 @@ static bool setup_stack(void **esp, char **argv, int argc) {
     *esp -= sizeof(void *);
     *(void **)(*esp) = NULL;
 
-
     return success;
 }
+
 
 
 /* Adds a mapping from user virtual address UPAGE to kernel
