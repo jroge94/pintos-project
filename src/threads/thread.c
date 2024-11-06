@@ -1,3 +1,5 @@
+// thread.c
+
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -283,14 +285,38 @@ struct thread* thread_current(void) {
 /* Returns the running thread's tid. */
 tid_t thread_tid(void) { return thread_current()->tid; }
 
+/* Retrieves a thread by its TID from the all_list. */
+struct thread* get_thread_by_tid(tid_t tid) {
+  struct list_elem *e;
+  struct thread *t;
+
+  enum intr_level old_level = intr_disable();  /* Disable interrupts */
+
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid) {
+      intr_set_level(old_level);  /* Restore interrupt level */
+      return t;
+    }
+  }
+
+  intr_set_level(old_level);  /* Restore interrupt level */
+  return NULL;  /* Thread not found */
+}
+
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void thread_exit(void) {
+  struct thread *cur = thread_current();
   ASSERT(!intr_context());
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_switch_tail(). */
+
+  #ifdef USERPROG
+    process_exit();
+  #endif
   intr_disable();
   list_remove(&thread_current()->allelem);
   thread_current()->status = THREAD_DYING;
@@ -430,6 +456,17 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   t->priority = priority;
   t->pcb = NULL;
   t->magic = THREAD_MAGIC;
+
+  #ifdef USERPROG
+    /* Initialize the child list and child lock */
+    list_init(&t->child_list);
+    lock_init(&t->child_lock);
+    t->cp = NULL;
+    t->exec_file = NULL;
+    t->fd_table = NULL;
+    t->fd_table_size = 0;
+    t->next_fd = 2;  // Typically, 0 is stdin, 1 is stdout; start from 2
+  #endif
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);

@@ -1,8 +1,11 @@
+// Process.h contains the process control block (PCB) and child_process
+
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
 #include <stdint.h>
+
 
 // At most 8MB can be allocated to the stack
 // These defines will be used in Project 2: Multithreading
@@ -17,6 +20,17 @@ typedef tid_t pid_t;
 typedef void (*pthread_fun)(void*);
 typedef void (*stub_fun)(pthread_fun, void*);
 
+
+struct child_process {
+  pid_t pid; // Process ID of child
+  int exit_status; // Exit status of child
+  bool waited; // Whether wait() was called
+  struct semaphore sema_wait; // Semaphore for parent to wait on child
+  struct semaphore load_sema;
+  bool load_success;
+  struct list_elem elem; // List element for child list.
+};
+
 /* The process control block for a given process. Since
    there can be multiple threads per process, we need a separate
    PCB from the TCB. All TCBs in a process will have a pointer
@@ -27,7 +41,7 @@ struct process {
   uint32_t* pagedir;          /* Page directory. */
   char process_name[16];      /* Name of the main thread */
   struct thread* main_thread; /* Pointer to main thread */
-  int exit_status;            /* Exit status of the process */
+  struct list child_processes; 
 };
 
 void userprog_init(void);
