@@ -3,12 +3,12 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+#include "filesys/file.h" /* Include for struct file */
+#include "threads/fixed-point.h"
+#include "threads/synch.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "threads/synch.h"
-#include "threads/fixed-point.h"
-#include "filesys/file.h"   /* Include for struct file */
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -94,24 +94,26 @@ struct thread {
   struct list_elem allelem;  /* List element for all threads list. */
 
   /* Shared between thread.c and synch.c. */
-  struct list_elem elem; /* List element. */
+  struct list_elem elem;    /* List element. */
+  bool process_exit_called; // Flag to indicate if process_exit() was called
 
 #ifdef USERPROG
   /* Owned by process.c. */
-  struct process* pcb;     /* Process control block if this thread is a user process. */
-  uint32_t* pagedir;       /* Page directory. */
-  int exit_status;         /* Exit status of the process. */
+  struct process*
+      pcb; /* Process control block if this thread is a user process. */
+  uint32_t* pagedir; /* Page directory. */
+  int exit_status;   /* Exit status of the process. */
 
   /* Additional members for process management. */
-  struct list child_list;         /* List of child processes. */
-  struct lock child_lock;         /* Lock for accessing child_list. */
-  struct child_process* cp;       /* Child process info for this thread. */
-  struct file* exec_file;         /* Executable file associated with the process. */
+  struct list child_list;   /* List of child processes. */
+  struct lock child_lock;   /* Lock for accessing child_list. */
+  struct child_process* cp; /* Child process info for this thread. */
+  struct file* exec_file;   /* Executable file associated with the process. */
 
-   /* File descriptor table */
-  struct file** fd_table;         /* Pointer to the file descriptor table */
-  int fd_table_size;              /* Size of the file descriptor table */
-  int next_fd;    
+  /* File descriptor table */
+  struct file** fd_table; /* Pointer to the file descriptor table */
+  int fd_table_size;      /* Size of the file descriptor table */
+  int next_fd;
 #endif
 
   /* Owned by thread.c. */
