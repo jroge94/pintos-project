@@ -104,6 +104,11 @@ struct thread {
   uint32_t* pagedir; /* Page directory. */
   int exit_status;   /* Exit status of the process. */
 
+  /* Owned by userprog/syscall.c. */
+  struct semaphore sema_wait;
+  struct semaphore load_sema;
+  bool load_success;
+
   /* Additional members for process management. */
   struct list child_list;   /* List of child processes. */
   struct lock child_lock;   /* Lock for accessing child_list. */

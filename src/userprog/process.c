@@ -259,8 +259,7 @@ static void start_process(void* file_name_) {
   /* If load failed, set exit status to -1 and exit. */
   if (!success) {
     thread_current()->exit_status = -1; // Set exit status
-    printf("%s: exit(-1)\n", thread_current()->name);
-    thread_exit(); // Terminate process if load fails
+    thread_exit();                      // Terminate process if load fails
   }
 
   /* Start the user process by simulating a return from an interrupt */
@@ -321,10 +320,8 @@ void process_exit(void) {
 
   /* Close executable file and allow writes */
   if (cur->exec_file != NULL) {
-    lock_acquire(&filesys_lock);
     file_allow_write(cur->exec_file);
     file_close(cur->exec_file);
-    lock_release(&filesys_lock);
   }
 
   /* Notify parent process */
@@ -412,8 +409,8 @@ static bool load(const char* file_name, void (**eip)(void), void** esp,
 
   /* Deny write to the executable file */
   file_deny_write(file);
-  t->exec_file = file;
   lock_release(&filesys_lock);
+  t->exec_file = file;
 
   /* Read and verify executable header */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
