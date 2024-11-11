@@ -62,6 +62,7 @@
         "*.inc": "c",
         "syscall-nr.h": "c",
         "string.h": "c",
-        "shutdown.h": "c"
+        "shutdown.h": "c",
+        "stdio.h": "c"
     },
 }

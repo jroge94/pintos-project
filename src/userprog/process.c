@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_ARGS 128
 
 struct start_process_data {
   char *file_name;
@@ -29,7 +30,7 @@ struct start_process_data {
 };
 static thread_func start_process NO_RETURN;
 static thread_func start_pthread NO_RETURN;
-static bool load(const char* file_name, void (**eip)(void), void** esp);
+static bool load(const char* file_name, void (**eip)(void), void** esp, char **argv, int argc);
 bool setup_thread(void (**eip)(void), void** esp);
 
 /* Initializes user programs in the system by ensuring the main
@@ -85,6 +86,43 @@ void process_exit_with_status(int status) {
 
     thread_exit();
 }
+
+/* Function to parse the command line into argc and argv */
+static char *parse_command_line(const char *cmdline, int *argc, char ***argv) {
+    char *argv_storage[MAX_ARGS];
+    char *token, *save_ptr;
+    int count = 0;
+
+    /* Make a writable copy of cmdline */
+    char *cmdline_copy = palloc_get_page(0);
+    if (cmdline_copy == NULL)
+        PANIC("Not enough memory to parse command line.");
+    strlcpy(cmdline_copy, cmdline, PGSIZE);
+
+    /* Tokenize the command line */
+    token = strtok_r(cmdline_copy, " ", &save_ptr);
+    while (token != NULL && count < MAX_ARGS) {
+        argv_storage[count++] = token;
+        token = strtok_r(NULL, " ", &save_ptr);
+    }
+
+    /* Allocate memory for argv */
+    *argv = malloc(sizeof(char *) * (count + 1));  // Use malloc instead of palloc_get_page
+    if (*argv == NULL)
+        PANIC("Not enough memory for argv.");
+
+    /* Initialize argv with tokens */
+    for (int i = 0; i < count; i++) {
+        (*argv)[i] = argv_storage[i];
+    }
+    (*argv)[count] = NULL;  // Null-terminate argv
+
+    *argc = count;
+
+    
+    return cmdline_copy;
+}
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -165,7 +203,9 @@ static void start_process(void* file_name_) {
   struct thread* t = thread_current();
   struct intr_frame if_;
   bool success;
-
+  int argc;
+  char **argv;
+  char *cmdline_copy;
 
   /* Allocate and initialize the PCB for the thread */
   t->pcb = calloc(sizeof(struct process), 1);
@@ -387,7 +427,7 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
-bool load(const char* file_name, void (**eip)(void), void** esp) {
+bool load(const char* file_name, void (**eip)(void), void** esp, char **argv, int argc) {
   struct thread* t = thread_current();
   struct Elf32_Ehdr ehdr;
   struct file* file = NULL;
