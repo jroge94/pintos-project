@@ -27,16 +27,17 @@ course staff.
 
 ### Argument Passing - Algorithms
 
-- Briefly describe how you implemented argument parsing.  How do you arrange for the
-  elements of `argv[]` to be in the right order? How do you avoid overflowing the
-  stack page?
+- Briefly describe how you implemented argument parsing.  How do you arrange for the elements of `argv[]` to be in the right order? How do you avoid overflowing the stack page?
 
 ### Argument Passing - Rationale
 
 - Why does PintOS implement `strtok_r()` but not `strtok()`?
-- In PintOS, the kernel separates commands into a executable name and arguments.  In
-  Unix-like systems, the shell does this separation. Identify at least two 
-  advantages of the Unix approach.
+strtok_r() ids thread-safe. uses a third argument, a pointer to a char *, to store the parsing context, making it re-entrant and thread-safe.
+- In PintOS, the kernel separates commands into a executable name and arguments. In Unix-like systems, the shell does this separation. Identify at least two advantages of the Unix approach.
+The kernel only needs to execute the program with the provided arguments, without the overhead of parsing the command line itself.
+Having the shell handle argument parsing provides users with the flexibility to customize their environment.
+
+  
 
 ## System Calls
 

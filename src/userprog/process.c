@@ -322,7 +322,9 @@ void process_exit(void) {
   if (cur->exec_file != NULL) {
     file_allow_write(cur->exec_file);
     file_close(cur->exec_file);
+
     cur->exec_file = NULL;
+
   }
 
   /* Notify parent process */
@@ -474,6 +476,7 @@ static bool load(const char* file_name, void (**eip)(void), void** esp,
 
         if (!load_segment(file, file_page, (void*)mem_page, read_bytes,
                           zero_bytes, writable)) {
+          
           goto done;
         }
       } else {
@@ -499,6 +502,7 @@ done:
   /* If load failed, close the file */
   if (!success) {
     lock_acquire(&filesys_lock);
+    
     if (file != NULL) {
       file_allow_write(file); // Balance file_deny_write()
       file_close(file);

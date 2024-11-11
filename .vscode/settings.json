@@ -64,5 +64,4 @@
         "string.h": "c",
         "shutdown.h": "c",
         "stdio.h": "c"
-    },
 }
