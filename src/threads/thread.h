@@ -1,11 +1,14 @@
+// thread.h
+
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+#include "filesys/file.h" /* Include for struct file */
+#include "threads/fixed-point.h"
+#include "threads/synch.h"
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "threads/synch.h"
-#include "threads/fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -29,9 +32,9 @@ typedef int tid_t;
 
    Each thread structure is stored in its own 4 kB page.  The
    thread structure itself sits at the very bottom of the page
-   (at offset 0).  The rest of the page is reserved for the
+   (at offset 0). The rest of the page is reserved for the
    thread's kernel stack, which grows downward from the top of
-   the page (at offset 4 kB).  Here's an illustration:
+   the page (at offset 4 kB). Here's an illustration:
 
         4 kB +---------------------------------+
              |          kernel stack           |
@@ -57,27 +60,27 @@ typedef int tid_t;
 
    The upshot of this is twofold:
 
-      1. First, `struct thread' must not be allowed to grow too
-         big.  If it does, then there will not be enough room for
-         the kernel stack.  Our base `struct thread' is only a
-         few bytes in size.  It probably should stay well under 1
+      1. First, `struct thread` must not be allowed to grow too
+         big. If it does, then there will not be enough room for
+         the kernel stack. Our base `struct thread` is only a
+         few bytes in size. It probably should stay well under 1
          kB.
 
       2. Second, kernel stacks must not be allowed to grow too
-         large.  If a stack overflows, it will corrupt the thread
-         state.  Thus, kernel functions should not allocate large
-         structures or arrays as non-static local variables.  Use
+         large. If a stack overflows, it will corrupt the thread
+         state. Thus, kernel functions should not allocate large
+         structures or arrays as non-static local variables. Use
          dynamic allocation with malloc() or palloc_get_page()
          instead.
 
    The first symptom of either of these problems will probably be
    an assertion failure in thread_current(), which checks that
-   the `magic' member of the running thread's `struct thread' is
-   set to THREAD_MAGIC.  Stack overflow will normally change this
+   the `magic` member of the running thread's `struct thread` is
+   set to THREAD_MAGIC. Stack overflow will normally change this
    value, triggering the assertion. */
-/* The `elem' member has a dual purpose.  It can be an element in
+/* The `elem` member has a dual purpose. It can be an element in
    the run queue (thread.c), or it can be an element in a
-   semaphore wait list (synch.c).  It can be used these two ways
+   semaphore wait list (synch.c). It can be used these two ways
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
@@ -91,11 +94,31 @@ struct thread {
   struct list_elem allelem;  /* List element for all threads list. */
 
   /* Shared between thread.c and synch.c. */
-  struct list_elem elem; /* List element. */
+  struct list_elem elem;    /* List element. */
+  bool process_exit_called; // Flag to indicate if process_exit() was called
 
 #ifdef USERPROG
   /* Owned by process.c. */
-  struct process* pcb; /* Process control block if this thread is a userprog */
+  struct process*
+      pcb; /* Process control block if this thread is a user process. */
+  uint32_t* pagedir; /* Page directory. */
+  int exit_status;   /* Exit status of the process. */
+
+  /* Owned by userprog/syscall.c. */
+  struct semaphore sema_wait;
+  struct semaphore load_sema;
+  bool load_success;
+
+  /* Additional members for process management. */
+  struct list child_list;   /* List of child processes. */
+  struct lock child_lock;   /* Lock for accessing child_list. */
+  struct child_process* cp; /* Child process info for this thread. */
+  struct file* exec_file;   /* Executable file associated with the process. */
+
+  /* File descriptor table */
+  struct file** fd_table; /* Pointer to the file descriptor table */
+  int fd_table_size;      /* Size of the file descriptor table */
+  int next_fd;
 #endif
 
   /* Owned by thread.c. */
@@ -113,7 +136,7 @@ enum sched_policy {
 #define SCHED_DEFAULT SCHED_FIFO
 
 /* Determines which scheduling policy the kernel should use.
- * Controller by the kernel command-line options
+ * Controlled by the kernel command-line options
  *  "-sched-default", "-sched-fair", "-sched-mlfqs", "-sched-fifo"
  * Is equal to SCHED_FIFO by default. */
 extern enum sched_policy active_sched_policy;
@@ -148,5 +171,8 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+/* Function to get a thread by its TID. */
+struct thread* get_thread_by_tid(tid_t tid);
 
 #endif /* threads/thread.h */
