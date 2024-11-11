@@ -1,4 +1,18 @@
 #include "threads/init.h"
+#include "devices/input.h"
+#include "devices/kbd.h"
+#include "devices/rtc.h"
+#include "devices/serial.h"
+#include "devices/shutdown.h"
+#include "devices/timer.h"
+#include "devices/vga.h"
+#include "threads/interrupt.h"
+#include "threads/io.h"
+#include "threads/loader.h"
+#include "threads/malloc.h"
+#include "threads/palloc.h"
+#include "threads/pte.h"
+#include "threads/thread.h"
 #include <console.h>
 #include <debug.h>
 #include <inttypes.h>
@@ -9,27 +23,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <test-lib.h>
-#include "devices/kbd.h"
-#include "devices/input.h"
-#include "devices/serial.h"
-#include "devices/shutdown.h"
-#include "devices/timer.h"
-#include "devices/vga.h"
-#include "devices/rtc.h"
-#include "threads/interrupt.h"
-#include "threads/io.h"
-#include "threads/loader.h"
-#include "threads/malloc.h"
-#include "threads/palloc.h"
-#include "threads/pte.h"
-#include "threads/thread.h"
+
 #ifdef USERPROG
-#include "userprog/process.h"
+#include "tests/userprog/kernel/tests.h"
 #include "userprog/exception.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
-#include "tests/userprog/kernel/tests.h"
 #endif
 #ifdef THREADS
 #include "tests/threads/tests.h"
@@ -40,6 +41,18 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+
+void fpu_init(void) {
+  uint32_t cr0;
+
+  /* Clear EM (Emulation) and TS (Task Switched) bits in CR0 to enable FPU */
+  asm volatile("mov %%cr0, %0" : "=r"(cr0));
+  cr0 &= ~((uint32_t)(0x4 | 0x8)); // Clear bits 2 (EM) and 3 (TS)
+  asm volatile("mov %0, %%cr0" : : "r"(cr0));
+
+  /* Initialize the FPU to default state */
+  asm volatile("fninit");
+}
 
 /* Page directory with kernel mappings only. */
 uint32_t* init_page_dir;
@@ -90,12 +103,15 @@ int main(void) {
   console_init();
 
   /* Greet user. */
-  printf("Pintos booting with %'" PRIu32 " kB RAM...\n", init_ram_pages * PGSIZE / 1024);
+  printf("Pintos booting with %'" PRIu32 " kB RAM...\n",
+         init_ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
   palloc_init(user_page_limit);
   malloc_init();
   paging_init();
+
+  fpu_init();
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -220,7 +236,7 @@ static char** read_command_line(void) {
 /* Parses options in ARGV[]
    and returns the first non-option argument. */
 static char** parse_options(char** argv) {
-  bool scheduler_flags[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+  bool scheduler_flags[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (; *argv != NULL && **argv == '-'; argv++) {
     char* save_ptr;
@@ -280,7 +296,8 @@ static char** parse_options(char** argv) {
   if (sched_flags_set == 0)
     active_sched_policy = SCHED_DEFAULT;
   else if (sched_flags_set > 1)
-    PANIC("too many scheduler flags set: set at most one of \"-sched-fifo\", \"-sched-prio\", "
+    PANIC("too many scheduler flags set: set at most one of \"-sched-fifo\", "
+          "\"-sched-prio\", "
           "\"-sched-fair\", \"-sched-mlfqs\"");
   else if (scheduler_flags[SCHED_FIFO])
     active_sched_policy = SCHED_FIFO;
@@ -352,20 +369,20 @@ static void run_actions(char** argv) {
   /* Table of supported actions. */
   static const struct action actions[] = {
 #ifdef USERPROG
-      {"run", 2, run_task},
-      {"rukt", 2, run_userprog_kernel_task},
+    { "run", 2, run_task },
+    { "rukt", 2, run_userprog_kernel_task },
 #endif
 #ifdef THREADS
-      {"rtkt", 2, run_threads_kernel_task},
+    { "rtkt", 2, run_threads_kernel_task },
 #endif
 #ifdef FILESYS
-      {"ls", 1, fsutil_ls},
-      {"cat", 2, fsutil_cat},
-      {"rm", 2, fsutil_rm},
-      {"extract", 1, fsutil_extract},
-      {"append", 2, fsutil_append},
+    { "ls", 1, fsutil_ls },
+    { "cat", 2, fsutil_cat },
+    { "rm", 2, fsutil_rm },
+    { "extract", 1, fsutil_extract },
+    { "append", 2, fsutil_append },
 #endif
-      {NULL, 0, NULL},
+    { NULL, 0, NULL },
   };
 
   while (*argv != NULL) {
@@ -425,11 +442,14 @@ static void usage(void) {
 #endif // VM
 #endif // FILESYS
          "  -rs=SEED           Set random number seed to SEED.\n"
-         "  -sched-fair        Use alternate non-strict priority scheduler. Mutually exclusive "
+         "  -sched-fair        Use alternate non-strict priority scheduler. "
+         "Mutually exclusive "
          "with \"-sched-mlfqs\", \"-sched-prio\".\n"
-         "  -sched-mlfqs       Use multi-level feedback queue scheduler. Mutually exclusive with "
+         "  -sched-mlfqs       Use multi-level feedback queue scheduler. "
+         "Mutually exclusive with "
          "\"-sched-fair\", \"-sched-prio\".\n"
-         "  -sched-prio        Use strict-priority round-robin scheduler. Mutually exclusive with "
+         "  -sched-prio        Use strict-priority round-robin scheduler. "
+         "Mutually exclusive with "
          "\"-sched-fair\", \"-sched-mlfqs\".\n"
 #ifdef USERPROG
          "  -ul=COUNT          Limit user memory to COUNT pages.\n"

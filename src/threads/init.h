@@ -8,5 +8,6 @@
 
 /* Page directory with kernel mappings only. */
 extern uint32_t* init_page_dir;
+void fpu_init(void);
 
 #endif /* threads/init.h */
