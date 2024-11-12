@@ -306,6 +306,179 @@ For each of the 2 test cases you write, provide
   per test case, but you can use the same bug for both of your two test cases. These
   bugs should be related to your test case (e.g. syntax errors don't)
 
+## Test Case 1: seek-normal
+
+The seek-normal test case verifies the correct implementation of the seek system call in the PintOS operating system. The seek system call should update the file position indicator for an open file descriptor, allowing subsequent read or write operations to occur at a specified position within the file.
+
+### Overview of Test Mechanics and Expected Output
+Test Mechanics:
+
+File Creation and Opening:
+
+The test program attempts to open a file named testfile.txt. If it doesn't exist, it creates the file using the create system call.
+It then opens the file using the open system call and obtains a file descriptor (fd).
+Writing Initial Content:
+
+The program writes the string "Hello, PintOS!" to the file using the write system call.
+Seeking to a Specific Position:
+
+It calls `seek(fd, 7)` to move the file position indicator to position 7 within the file.
+Overwriting Content:
+
+From position 7, it writes the string "World" to the file, overwriting part of the existing content.
+Reading the Modified Content:
+
+The program calls seek(fd, 0) to return to the beginning of the file.
+It reads the entire content of the file into a buffer using the read system call.
+Displaying the Result:
+
+The final content of the file is printed to verify that the seek operation correctly updated the file position.
+Qualitative Description of Expected Output:
+
+The initial content of the file is "Hello, PintOS!".
+After seeking to position 7 and writing "World", the expected content becomes "Hello, World!".
+The program should output:
+```
+File content: Hello, World!
+seek-normal: pass
+```
+Output and Results from Running the Test Case
+seek-normal.output:
+```
+File content: Hello, World!
+seek-normal: pass
+seek-normal.result:
+Pass
+```
+Two Non-Trivial Potential Kernel Bugs and Their Effects
+- Bug: seek Does Not Update File Position Correctly
+- Issue: If the kernel's seek implementation fails to update the file position indicator, subsequent write operations occur at the incorrect position.
+- Effect on Output: The new string "World" might be appended at the end of the file instead of overwriting starting at position 7.
+- Expression:
+If my kernel did not update the file position after seek(fd, 7) (did X) and kept the position at the end of the file (did Y), then the test case would output:
+```
+File content: Hello, PintOS!World
+seek-normal: pass
+```
+- Bug: seek Allows Invalid Positions Without Proper Handling
+
+Issue: If the kernel allows seeking to positions beyond the file size or negative positions without validation.
+Effect on Output: Writing at an invalid position could cause a crash or write data to an unintended location.
+Expression:
+If my kernel allowed seeking to a negative position (did X) instead of validating and preventing it (did Y), then the test case might crash or output corrupted data, resulting in no output or an error message.
+
+### Test Case 2: tell-normal
+Description of the Feature Being Tested
+The tell-normal test case checks the correct functionality of the tell system call. The tell system call should accurately report the current position of the file position indicator for an open file descriptor.
+
+Overview of Test Mechanics and Expected Output
+Test Mechanics:
+
+File Creation and Opening:
+
+The test program attempts to open testfile.txt. If it doesn't exist, it creates the file using the create system call.
+It opens the file using the open system call and obtains a file descriptor (fd).
+Writing Content:
+
+It writes the string "Hello, PintOS!" to the file using the write system call.
+Using tell After Write:
+
+Calls `tell(fd)` to get the current file position after the write operation, which should be 14 (the length of the string).
+Seeking to Various Positions and Using tell:
+
+The program uses `seek(fd, position)` to move to positions 0, 5, and 7.
+After each seek, it calls `tell(fd)` to verify the current position.
+Displaying the Results:
+
+It prints the positions obtained from `tell(fd)` to confirm they match the expected values.
+Qualitative Description of Expected Output:
+
+After writing, the position should be 14.
+After seeking to positions 0, 5, and 7, the positions reported by tell(fd) should be 0, 5, and 7, respectively.
+
+The program should output:
+```
+Wrote 'Hello, PintOS!' to testfile.txt
+Current position after write: 14
+Seeking to position 0
+Current position: 0
+Seeking to position 5
+Current position: 5
+Seeking to position 7
+Current position: 7
+tell-normal: pass
+Output and Results from Running the Test Case
+tell-normal.output:
+```
+```
+Wrote 'Hello, PintOS!' to testfile.txt
+Current position after write: 14
+Seeking to position 0
+Current position: 0
+Seeking to position 5
+Current position: 5
+Seeking to position 7
+Current position: 7
+tell-normal: pass
+tell-normal.result:
+```
+
+Two Non-Trivial Potential Kernel Bugs and Their Effects
+Bug: tell Returns Incorrect Position After seek
+
+Issue: If the kernel fails to update the file position indicator after a seek operation, causing tell(fd) to return incorrect values.
+Effect on Output: The positions reported by tell(fd) after seeking would not match the expected values.
+Expression:
+If my kernel did not update the file position after seek(fd, position) (did X) and tell(fd) continued to return the previous position (did Y), then the test case would output:
+
+```
+Wrote 'Hello, PintOS!' to testfile.txt
+Current position after write: 14
+Seeking to position 0
+Current position: 14
+Seeking to position 5
+Current position: 14
+Seeking to position 7
+Current position: 14
+tell-normal: pass
+```
+
+- Bug: tell Does Not Account for Write Operations
+
+Issue: If the kernel does not update the file position after write operations, leading to incorrect values returned by tell(fd).
+Effect on Output: The initial position after the write might be reported as 0 instead of the correct position.
+Expression:
+If my kernel did not advance the file position after writing data (did X) and tell(fd) returned 0 (did Y), then the test case would output:
+
+```
+Wrote 'Hello, PintOS!' to testfile.txt
+Current position after write: 0
+Seeking to position 0
+Current position: 0
+Seeking to position 5
+Current position: 5
+Seeking to position 7
+Current position: 7
+tell-normal: pass
+```
+Note: In this scenario, the position after writing is incorrect, but seeking and telling afterward might still report correct positions due to seek resetting the position.
+
 In addition, tell us about your experience writing tests for PintOS. What can be
 improved about the PintOS testing system? What did you learn from writing test cases?
 
+### Concept Check
+- 1 sc-bad-arg.c
+Purpose:
+Tests the kernel's ability to handle invalid stack pointers during system calls.
+Behavior:
+Sets %esp to an invalid address.
+Triggers a system call, expecting the kernel to terminate the process with exit(-1).
+Expected Outcome:
+The process should be terminated safely without crashing the kernel.
+- 2 sc-boundary-2.c
+Purpose:
+Tests handling of system call arguments that cross memory boundaries.
+Behavior:
+Places syscall number or arguments across valid/invalid memory regions.
+Expected Outcome:
+The kernel should detect the invalid access and terminate the process.
