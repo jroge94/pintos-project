@@ -5,7 +5,6 @@ nav_enabled: false
 
 # Report Template
 
-```markdown
 # Project 1: User Programs
 
 ## Preliminaries
@@ -25,18 +24,107 @@ course staff.
   static variable, typedef, or enumeration.  Identify the purpose of each in 25 words
   or less.
 
+  ```c
+  static char* parse_command_line(const char* cmdline, int* argc, char*** argv);
+  ```
+  Purpose: Parses the command line string into individual arguments, populating argc (argument count) and argv (argument vector).
+
+  ```c
+  static bool setup_stack(void** esp, char** argv, int argc);
+  ```
+  Purpose: Enhanced to push command-line arguments onto the stack, setting up the user process's stack with argc and argv.
+
+  ```c
+  #define MAX_ARGS 128
+  ```  
+  Purpose: Defines the maximum number of command-line arguments to prevent buffer overflows during argument parsing.
+
+  ```c
+  void* arg_addr[MAX_ARGS];
+  ```
+  Purpose: An array to store the addresses of the argument strings on the stack, used to set up argv correctly.
+
 ### Argument Passing - Algorithms
 
 - Briefly describe how you implemented argument parsing.  How do you arrange for the
   elements of `argv[]` to be in the right order? How do you avoid overflowing the
   stack page?
 
+ **Process:**
+
+Create a Writable Copy of Command Line:
+
+- Makes a copy of the command line string using palloc_get_page() to avoid modifying the original string.
+  
+Tokenization:
+- Use strtok_r() to split the command line into tokens (arguments) based on spaces.
+  Stores each token into an array argv_storage[].
+  Counts the number of arguments (argc).
+  
+Allocate and Initialize argv:
+- Allocates memory for argv, an array of pointers to the arguments.
+  Copies pointers from argv_storage to argv.
+  Ensures argv is null-terminated.
+  
+Return Parsed Arguments:
+- Provides argc and argv to the caller for use in setting up the stack.
+
+**Arranging**
+
+Stack Growth Direction:
+- The x86 stack grows downward (from higher to lower memory addresses).
+
+Pushing Arguments onto the Stack:
+- Arguments are pushed onto the stack in reverse order (from last to first). 
+- This results in argv[0] being at the lowest address on the stack.
+
+Recording Argument Addresses:
+- As each argument string is pushed onto the stack, its address is stored in arg_addr[].
+- This array is then used to push the addresses onto the stack in reverse order, ensuring that argv[i] points to the correct argument string.
+
+**Avoiding Overflow**
+
+Limiting Number of Arguments:
+- The `MAX_ARGS` macro limits the number of arguments to prevent exceeding stack space.
+
+Stack Pointer Checks and Alignment:
+- Ensures that the stack pointer *esp does not move below the allocated stack page.
+- Aligns the stack pointer to a multiple of 4 bytes using:
+
+```c
+*esp = (void*)((uintptr_t)(*esp) & ~3);
+```
+- This alignment prevents misaligned accesses that could cause exceptions.
+
+Memory Allocation:
+- Uses only one page (4 KB) for the stack to prevent exceeding the allocated stack space.
+Carefully calculates the total size of arguments and pointers to ensure it fits within the stack limit.
+##
+
 ### Argument Passing - Rationale
 
 - Why does PintOS implement `strtok_r()` but not `strtok()`?
+
+  Thread Safety:
+- `strtok_r()` is a reentrant version of `strtok()`, which means it is thread-safe.
+- `strtok()` uses static internal state to keep track of parsing, making it unsafe in a multi-threaded   environment like PintOS.
+- Using `strtok_r()` ensures that multiple threads can parse strings simultaneously without interfering with each other.
+
 - In PintOS, the kernel separates commands into a executable name and arguments.  In
   Unix-like systems, the shell does this separation. Identify at least two 
   advantages of the Unix approach.
+
+Kernel Simplicity and Security:
+- By offloading command parsing to user-space programs (the shell), the kernel remains simpler and more secure.
+- Reduces the kernel's responsibility, minimizing the potential for bugs or security vulnerabilities in command parsing logic.
+
+User Customization:
+- Users can choose different shells or scripting languages with different features and syntax.
+- Allows for richer command-line interfaces and scripting capabilities without requiring changes to the kernel.
+- Error Handling and Feedback:
+- The shell can provide immediate feedback to the user on syntax errors or command issues.
+- Allows for more informative error messages and interactive corrections, improving user experience.
+
 
 ## System Calls
 
@@ -220,4 +308,4 @@ For each of the 2 test cases you write, provide
 
 In addition, tell us about your experience writing tests for PintOS. What can be
 improved about the PintOS testing system? What did you learn from writing test cases?
-```
+
